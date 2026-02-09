@@ -2366,10 +2366,14 @@ public class GCodeGenerator {
       var mcMinPt = GCodeGenerator.XfmToMachine (this, minPt);
       var mcMaxPt = GCodeGenerator.XfmToMachine (this, maxPt);
       var toolingLen = Utils.GetToolingLength (segments, startIndex, endIndex);
-      if (LeftToRightMachining)
-         sw.WriteLine ($"START_X={mcMinPt.X:F3} END_X={mcMaxPt.X:F3} PathLength={toolingLen:F2}");
-      else
-         sw.WriteLine ($"START_X={mcMaxPt.X:F3} END_X={mcMinPt.X:F3} PathLength={toolingLen:F2}");
+      
+      if (LeftToRightMachining) {
+         var statement = $"START_X={mcMinPt.X:F3} END_X={mcMaxPt.X:F3} PathLength={toolingLen:F2}";
+         sw.WriteLine (statement);
+      } else {
+         var statement = $"START_X={mcMaxPt.X:F3} END_X={mcMinPt.X:F3} PathLength={toolingLen:F2}";
+         sw.WriteLine (statement);
+      }
    }
 
    /// <summary>
@@ -2660,7 +2664,10 @@ public class GCodeGenerator {
          sw.WriteLine (GetGCodeComment (" ** Notch: Tool Block Initialization ** "));
       else
          sw.WriteLine (GetGCodeComment (" ** Cutout: Tool Block Initialization ** "));
-      sw.WriteLine (GetGCodeComment ($"{comment}"));
+      if (Utils.IsGCodeComment(comment))
+         sw.WriteLine (comment);
+      else
+         sw.WriteLine (GetGCodeComment (comment));
       WriteProgramHeader (toolingItem, points, xStart, xPartition, xEnd, isFlexCut, isLast,
          isValidNotch: isValidNotch, prevToolingItem, refSeg: refSeg, nextSeg: nextTs);
       if (CreateDummyBlock4Master) {

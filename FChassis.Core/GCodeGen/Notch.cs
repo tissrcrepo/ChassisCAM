@@ -2212,7 +2212,7 @@ public class Notch : ToolingFeature {
                   }
 
                   var refTS = new ToolingSegment (new Line3 (nMid2, mSegments[mNotchIndices.segIndexAtWJTApproach].Curve.End), notchApproachEndNormal, notchApproachEndNormal);
-                  titleComment = titleComment + "\n" + "Notch: Move to Mid2 towards machining again the rest of the tooling segment";
+                  titleComment = titleComment + "\n" + GCodeGenerator.GetGCodeComment("Notch: Move to Mid2 towards machining again the rest of the tooling segment");
                   mGCodeGen.InitializeNotchToolingBlock (mToolingItem, prevToolingItem: null, pts, notchApproachStNormal,
                      mXStart, mXPartition, mXEnd, isFlexCut: false, ii == mNotchSequences.Count - 1, refTS, nextTs: null,
                      isValidNotch: true,

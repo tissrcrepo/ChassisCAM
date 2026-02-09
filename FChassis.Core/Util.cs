@@ -2033,6 +2033,7 @@ public static class Utils {
                                      bool createDummyBlock4Master = false) {
       if (machine == MachineType.LCMMultipass2H && createDummyBlock4Master) return "";
       string gcodeStatement = $"G0 X{x:F3} Y{y:F3} Z{z:F3} A{a:F3}";
+      gcodeStatement = NormalizeNegativeZero (gcodeStatement);
       sw.WriteLine (gcodeStatement);
       return gcodeStatement;
    }
@@ -2063,6 +2064,7 @@ public static class Utils {
          gcodeStatement = $"G0 X{x:F3} Y{val:F3} A{a:F3} {extraToken} {(string.IsNullOrEmpty (comment) ? "" : $" ({comment})")}";
       else if (oaxis == OrdinateAxis.Z)
          gcodeStatement = $"G0 X{x:F3} Z{val:F3} A{a:F3} {extraToken} {(string.IsNullOrEmpty (comment) ? "" : $" ({comment})")}";
+      gcodeStatement = NormalizeNegativeZero (gcodeStatement);
       sw.WriteLine (gcodeStatement);
       return gcodeStatement;
    }
@@ -2090,6 +2092,7 @@ public static class Utils {
          gcodeStatement = $"G0 X{x:F3} Y{val:F3} {extraToken} {(string.IsNullOrEmpty (comment) ? "" : $" ({comment})")}";
       else if (oaxis == OrdinateAxis.Z)
          gcodeStatement = $"G0 X{x:F3} Z{val:F3} {extraToken} {(string.IsNullOrEmpty (comment) ? "" : $" ({comment})")}";
+      gcodeStatement = NormalizeNegativeZero (gcodeStatement);
       sw.WriteLine (gcodeStatement);
       return gcodeStatement;
    }
@@ -2114,6 +2117,7 @@ public static class Utils {
       if (machine == MachineType.LCMMultipass2H && createDummyBlock4Master)
          return "";
       string gcodeStatement = $"G1 X{x:F3} Y{y:F3} Z{z:F3} A{a:F3} F{f:F0} {(string.IsNullOrEmpty (comment) ? "" : $" ({comment})")}";
+      gcodeStatement = NormalizeNegativeZero (gcodeStatement);
       sw.WriteLine (gcodeStatement);
       return gcodeStatement;
    }
@@ -2135,6 +2139,7 @@ public static class Utils {
       if (machine == MachineType.LCMMultipass2H && createDummyBlock4Master)
          return "";
       string gcodeStatement = $"G1 X{x:F3} Y{y:F3} Z{z:F3} A{a:F3} {(string.IsNullOrEmpty (comment) ? "" : $" ({comment})")}";
+      gcodeStatement = NormalizeNegativeZero (gcodeStatement);
       sw.WriteLine (gcodeStatement);
       return gcodeStatement;
    }
@@ -2156,6 +2161,7 @@ public static class Utils {
       if (machine == MachineType.LCMMultipass2H && createDummyBlock4Master)
          return "";
       string gcodeStatement = $"G1 X{x:F3} Y{y:F3} Z{z:F3}{(string.IsNullOrEmpty (comment) ? "" : $" ({comment})")}";
+      gcodeStatement = NormalizeNegativeZero (gcodeStatement);
       sw.WriteLine (gcodeStatement);
       return gcodeStatement;
    }
@@ -2184,6 +2190,7 @@ public static class Utils {
          gcodeStatement = $"G1 X{x:F3} Y{val:F3} A{a:F3}{(string.IsNullOrEmpty (comment) ? "" : $" ({comment})")}";
       else if (oaxis == OrdinateAxis.Z)
          gcodeStatement = $"G1 X{x:F3} Z{val:F3} A{a:F3}{(string.IsNullOrEmpty (comment) ? "" : $" ({comment})")}";
+      gcodeStatement = NormalizeNegativeZero (gcodeStatement);
       sw.WriteLine (gcodeStatement);
       return gcodeStatement;
    }
@@ -2211,6 +2218,7 @@ public static class Utils {
          gcodeStatement = $"G1 X{x:F3} Y{val:F3}{(string.IsNullOrEmpty (comment) ? "" : $" ({comment})")}";
       else if (oaxis == OrdinateAxis.Z)
          gcodeStatement = $"G1 X{x:F3} Z{val:F3}{(string.IsNullOrEmpty (comment) ? "" : $" ({comment})")}";
+      gcodeStatement = NormalizeNegativeZero (gcodeStatement);
       sw.WriteLine (gcodeStatement);
       return gcodeStatement;
    }
@@ -2279,6 +2287,7 @@ public static class Utils {
          else
             gCodeStatement = $"G{(arcSense == Utils.EArcSense.CW ? 2 : 3)} I{i:F3} K{val:F3} ";
       }
+      gCodeStatement = NormalizeNegativeZero (gCodeStatement);
       sw.Write (gCodeStatement);
 
       string gCodeComment = "";
@@ -2360,6 +2369,7 @@ public static class Utils {
             gCodeStatement = $"G{(arcSense == Utils.EArcSense.CW ? 2 : 3)} I{i:F3} K{val:F3}";
          gCodeStatement += $" X{x:F3} Z{y:F3}";
       }
+      gCodeStatement = NormalizeNegativeZero (gCodeStatement);
       sw.WriteLine (gCodeStatement);
       return gCodeStatement;
    }
@@ -2731,5 +2741,33 @@ public static class Utils {
       if (Utils.IsToolingOnFlex (ts.Vec0, ts.Vec1))
          return true;
       return false;
+   }
+
+   public static bool IsGCodeComment (string line) {
+      if (string.IsNullOrWhiteSpace (line))
+         return false;
+
+      int start = 0;
+      int end = line.Length - 1;
+
+      // Skip leading spaces/tabs
+      while (start < line.Length && char.IsWhiteSpace (line[start]))
+         start++;
+
+      // Skip trailing spaces/tabs
+      while (end >= 0 && char.IsWhiteSpace (line[end]))
+         end--;
+
+      if (start >= end)
+         return false;
+
+      return line[start] == '(' && line[end] == ')';
+   }
+
+   public static string NormalizeNegativeZero (string input) {
+      if (string.IsNullOrEmpty (input))
+         return input;
+
+      return input.Replace ("-0.000", "0.000");
    }
 }
