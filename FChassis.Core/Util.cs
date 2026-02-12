@@ -6,7 +6,6 @@ using FChassis.Core.Geometries;
 using System.Text.Json;
 using static FChassis.Core.Geometries.Geom;
 using static FChassis.Core.MCSettings;
-using System.Collections.Generic;
 
 namespace FChassis.Core;
 
@@ -80,6 +79,8 @@ public class MachinableCutScope {
 }
 
 internal static class Extensions {
+   public static double ToRadians (this double deg) => deg * Math.PI / 180.0;
+   public static double ToDegrees (this double rad) => rad * 180.0 / Math.PI;
    public static double LieOn (this double f, double a, double b) => (f - a) / (b - a);
    public static bool EQ (this double a, double b) => Abs (a - b) < 1e-6;
    public static bool EQ (this double a, double b, double err) => Abs (a - b) < err;
@@ -1120,7 +1121,7 @@ public static class Utils {
          }
 
          // Compute the scrap side direction
-         (firstToolingEntryPt, materialRemovalDirection) = Utils.GetMaterialRemovalSideDirection (toolingSegmentsList);
+           (firstToolingEntryPt, materialRemovalDirection) = Utils.GetMaterialRemovalSideDirection (toolingSegmentsList);
 
          // Compute the tooling direction.
          Vector3 toolingDir;
@@ -1139,7 +1140,10 @@ public static class Utils {
          var newToolingStPt = arcCenter - toolingDir * approachArcRad;
 
          // Find 2 points on the ray from newToolingStPt in the direction of -toolingDir, from the center of the arc
-         var p1 = firstToolingEntryPt - toolingDir * 4.0; var p2 = firstToolingEntryPt - toolingDir * 2.0;
+         //var p1 = firstToolingEntryPt - toolingDir * 4.0; var p2 = firstToolingEntryPt - toolingDir * 2.0;
+         Curve3 chord = new Line3 (newToolingStPt, firstToolingEntryPt);
+         var p1 = chord.Evaluate (0.4);
+         var p2 = chord.Evaluate (0.7);
 
          // Compute the vectors from center of the arc to the above points
          var cp1 = (p1 - arcCenter).Normalized (); var cp2 = (p2 - arcCenter).Normalized ();
@@ -1148,6 +1152,7 @@ public static class Utils {
          // intermediate points along the actual direction of the arc
          var ip1 = arcCenter + cp1 * approachArcRad; var ip2 = arcCenter + cp2 * approachArcRad;
 
+         //var (cirCenter, cirRad) = EvaluateCenterAndRadius (toolingSegmentsList[0].Curve as Arc3);
          // Create arc, the fourth point being the midpoint of the arc or starting point
          // if its a circle.
          Arc3 arc = new (newToolingStPt, ip1, ip2, firstToolingEntryPt);
@@ -2297,6 +2302,7 @@ public static class Utils {
          gCodeComment += $"  Radius: {rad:F3} ";
       }
 
+      gCodeComment = NormalizeNegativeZero (gCodeComment);
       sw.WriteLine (GCodeGenerator.GetGCodeComment (gCodeComment));
       return gCodeStatement + gCodeComment;
    }
@@ -2653,14 +2659,43 @@ public static class Utils {
          cumLen += seg.Curve.Length;
       return cumLen;
    }
-   public static double GetToolingLength (List<ToolingSegment> segs, int startIndex = -1, int endIndex = -1) {
+
+   public static double GetToolingLengthWithLeadIn (List<ToolingSegment> segs) {
       if (segs == null) throw new ArgumentException ("argument List<ToolingSegment> segs is null,", nameof (segs));
-      if (startIndex == -1 && endIndex == -1) return GetToolingLength (segs);
+      double cumLen = 0;
+      for (int ii = 0; ii < segs.Count; ii++) {
+         if (ii == 0 ) {
+            Arc3 arc = segs[0].Curve as Arc3;
+            // In lead ins, the length of the arc is 2*Pi*r/4 / specified in LeadInApproachArcAngle degrees (90 def)
+            var (_, rad) = EvaluateCenterAndRadius (arc);
+            //cumLen += Math.PI * rad / 2;
+            cumLen += MCSettings.It.LeadInApproachArcAngle.ToRadians () * rad;
+         }else
+            cumLen += segs[ii].Curve.Length;
+      }
+      return cumLen;
+   }
+   
+   public static double GetToolingLength (List<ToolingSegment> segs, int startIndex = -1, int endIndex = -1, bool leadIn = false) {
+      if (segs == null) throw new ArgumentException ("argument List<ToolingSegment> segs is null,", nameof (segs));
+      if (startIndex == -1 && endIndex == -1) {
+         if (leadIn) return GetToolingLengthWithLeadIn (segs);
+         return GetToolingLength (segs);
+      }
       if (startIndex == -1 || endIndex == -1) throw new Exception ("Start and End indices should be valid index");
-      double len = 0;
-      for (int ii = startIndex; ii <= endIndex; ii++)
-         len += segs[startIndex].Curve.Length;
-      return len;
+      double cumLen = 0;
+      for (int ii = startIndex; ii <= endIndex; ii++) {
+         if (ii == 0 && leadIn) {
+               Arc3 arc = segs[0].Curve as Arc3;
+               // In lead ins, the length of the arc is 2*Pi*r/4 = Pi*r/2;
+               var (_, rad) = EvaluateCenterAndRadius (arc);
+            //cumLen += Math.PI * rad / 2;
+            cumLen += MCSettings.It.LeadInApproachArcAngle.ToRadians () * rad;
+
+         } else
+            cumLen += segs[startIndex].Curve.Length;
+      }
+      return cumLen;
    }
 
    public static bool IsSameSideExitNotch (Tooling ti) {
@@ -2729,8 +2764,8 @@ public static class Utils {
       Point3 intPoint1;
       Point3 intPoint2;
 
-      intPoint1 = XForm4.AxisRotation (apn, cen, newStPt, Math.PI / 4);
-      intPoint2 = XForm4.AxisRotation (apn, cen, newStPt, -Math.PI / 4);
+      intPoint1 = XForm4.AxisRotation (apn, cen, newStPt, MCSettings.It.LeadInApproachArcAngle.ToRadians ());
+      intPoint2 = XForm4.AxisRotation (apn, cen, newStPt, -MCSettings.It.LeadInApproachArcAngle.ToRadians ());
 
       (cen, rad) = Geom.EvaluateCenterAndRadius (arc);
 

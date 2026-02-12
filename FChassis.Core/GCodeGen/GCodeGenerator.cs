@@ -462,6 +462,7 @@ public class GCodeGenerator {
       OptimizePartition = mcs.OptimizePartition;
       SlotWithWJTOnly = mcs.SlotWithWJTOnly;
       DualFlangeCutoutNotchOnly = mcs.DualFlangeCutoutNotchOnly;
+      LeadInApproachArcAngle = mcs.LeadInApproachArcAngle;
       OptimizeSequence = mcs.OptimizeSequence;
       SafetyZone = mcs.SafetyZone;
       EnableMultipassCut = mcs.EnableMultipassCut;
@@ -522,6 +523,7 @@ public class GCodeGenerator {
    public bool OptimizePartition { get; set; }
    public bool SlotWithWJTOnly { get; set; }
    public bool DualFlangeCutoutNotchOnly { get; set; }
+   public double LeadInApproachArcAngle { get; set; }
    public double SafetyZone { get; set; }
    public EKind[] ToolingPriority { get; set; }
    public double NotchWireJointDistance { get; set; } = 2.0;
@@ -725,6 +727,7 @@ public class GCodeGenerator {
       OptimizePartition = MCSettings.It.OptimizePartition;
       SlotWithWJTOnly = MCSettings.It.SlotWithWJTOnly;
       DualFlangeCutoutNotchOnly = MCSettings.It.DualFlangeCutoutNotchOnly;
+      LeadInApproachArcAngle = MCSettings.It.LeadInApproachArcAngle;
       SafetyZone = MCSettings.It.SafetyZone;
       EnableMultipassCut = MCSettings.It.EnableMultipassCut;
       MaxFrameLength = MCSettings.It.MaxFrameLength;
@@ -2365,8 +2368,16 @@ public class GCodeGenerator {
       var minPt = new Point3 (xMin, 0, 0); var maxPt = new Point3 (xMax, 0, 0);
       var mcMinPt = GCodeGenerator.XfmToMachine (this, minPt);
       var mcMaxPt = GCodeGenerator.XfmToMachine (this, maxPt);
-      var toolingLen = Utils.GetToolingLength (segments, startIndex, endIndex);
-      
+      double toolingLen;
+      if (segments.Count == 2 && segments[1].Curve is Arc3) {
+         Arc3 arc = segments[1].Curve as Arc3;
+         if (IsCircle (arc))
+            toolingLen = Utils.GetToolingLength (segments, startIndex, endIndex, leadIn: true);
+         else
+            toolingLen = Utils.GetToolingLength (segments, startIndex, endIndex, leadIn: false);
+      } else
+         toolingLen = Utils.GetToolingLength (segments, startIndex, endIndex, leadIn: false);
+
       if (LeftToRightMachining) {
          var statement = $"START_X={mcMinPt.X:F3} END_X={mcMaxPt.X:F3} PathLength={toolingLen:F2}";
          sw.WriteLine (statement);
@@ -2664,7 +2675,7 @@ public class GCodeGenerator {
          sw.WriteLine (GetGCodeComment (" ** Notch: Tool Block Initialization ** "));
       else
          sw.WriteLine (GetGCodeComment (" ** Cutout: Tool Block Initialization ** "));
-      if (Utils.IsGCodeComment(comment))
+      if (Utils.IsGCodeComment (comment))
          sw.WriteLine (comment);
       else
          sw.WriteLine (GetGCodeComment (comment));
@@ -2867,7 +2878,7 @@ public class GCodeGenerator {
          if (toolingItem.Flange == EFlange.Web && !CutWeb) continue;
          if ((toolingItem.Flange == EFlange.Top || toolingItem.Flange == EFlange.Bottom) && !CutFlange) continue;
          if (SlotWithWJTOnly && !toolingItem.IsSlotWithWJT ()) continue;
-         if (DualFlangeCutoutNotchOnly && !toolingItem.IsDualFlangeCutoutNotch()) continue;
+         if (DualFlangeCutoutNotchOnly && !toolingItem.IsDualFlangeCutoutNotch ()) continue;
 
          // Debug_Debug
          firstTlgStartPoint = toolingItem.Segs.ToList ()[0].Curve.Start;
@@ -3139,7 +3150,7 @@ public class GCodeGenerator {
       );
 
       MoveToMachiningStartPosition (nextMachiningStart, wjtSeg.Vec0, toolingItem.Name);
-      
+
       WriteToolCorrectionData (toolingItem);
 
       if (isValidNotch)

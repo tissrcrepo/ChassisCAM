@@ -55,8 +55,9 @@ public partial class MCSettings : INotifyPropertyChanged {
       WorkpieceOptionsFilename = @"W:\FChassis\LCM2HWorkpieceOptions.json";
       DeadbandWidth = 980.0;
       LeastWJLength = 0.24999999999999999999999;
+      mLeadInApproachArcAngle = 90.0;
 #if DEBUG
-      Version = "Debug 91"; 
+      Version = "Debug 91";
 #elif TESTRELEASE
       Version = " Test Release 91";
 #else
@@ -116,6 +117,7 @@ public partial class MCSettings : INotifyPropertyChanged {
       OptimizePartition = other.OptimizePartition;
       SlotWithWJTOnly = other.SlotWithWJTOnly;
       DualFlangeCutoutNotchOnly = other.DualFlangeCutoutNotchOnly;
+      LeadInApproachArcAngle = other.LeadInApproachArcAngle;
       //RotateX180 = other.RotateX180;
       IncludeFlange = other.IncludeFlange;
       IncludeCutout = other.IncludeCutout;
@@ -694,7 +696,7 @@ public partial class MCSettings : INotifyPropertyChanged {
       get => mSlotWithWJTOnly;
       set => SetProperty (ref mSlotWithWJTOnly, value);
    }
-   
+
    [IgnoreMember] // Ignore this field for MessagePack serialization
    bool mSlotWithWJTOnly;
 
@@ -708,6 +710,16 @@ public partial class MCSettings : INotifyPropertyChanged {
    [IgnoreMember] // Ignore this field for MessagePack serialization
    bool mDualFlangeCutoutNotchOnly;
 
+   [JsonPropertyName ("leadInApproachArcAngle")]
+   [Key (103)]
+   public double LeadInApproachArcAngle {
+      get => mLeadInApproachArcAngle;
+      set => SetProperty (ref mLeadInApproachArcAngle, value);
+   }
+
+   [IgnoreMember] // Ignore this field for MessagePack serialization
+   double mLeadInApproachArcAngle;
+
    #endregion Properties with JSON Attributes
 
    #region Data Members
@@ -716,8 +728,15 @@ public partial class MCSettings : INotifyPropertyChanged {
    #endregion
 
    #region JSON Read/Write Methods
+   void InitDefaults () {
+      if (LeadInApproachArcAngle.EQ (0))
+         LeadInApproachArcAngle = Math.PI / 180.0;
+   }
+
    // Method to serialize the singleton instance to a JSON file
    public void SaveSettingsToJson (string filePath) {
+      InitDefaults ();
+
       // Serialize the object to binary JSON using MessagePack
       var binaryJson = MessagePackSerializer.Serialize (It);
 
@@ -725,6 +744,8 @@ public partial class MCSettings : INotifyPropertyChanged {
       File.WriteAllBytes (filePath, binaryJson);
    }
    public void SaveSettingsToJsonASCII (string filePath) {
+      InitDefaults ();
+
       // JSON serializer options
       var jsonOptions = new JsonSerializerOptions {
          Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping, // Ensures ASCII encoding
@@ -804,7 +825,7 @@ public partial class MCSettings : INotifyPropertyChanged {
       }
    }
 
-   private void CopySettingsExcludingVersion (MCSettings source, MCSettings target) {
+   void CopySettingsExcludingVersion (MCSettings source, MCSettings target) {
       var properties = typeof (MCSettings).GetProperties (BindingFlags.Public | BindingFlags.Instance);
       foreach (var prop in properties) {
          if (prop.Name != nameof (MCSettings.Version) && prop.CanRead && prop.CanWrite) {
