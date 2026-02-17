@@ -517,6 +517,7 @@ Function .onInit
   StrCpy $LogFileHandle 0
   StrCpy $ShowRepairPage 0
 
+  ; FIRST: Set up LocalAppDataDir (needed for log file)
   ReadRegStr $LocalAppDataDir HKCU "Volatile Environment" "LOCALAPPDATA"
   ${If} $LocalAppDataDir == ""
     ReadRegStr $LocalAppDataDir HKCU "Environment" "LOCALAPPDATA"
@@ -524,19 +525,19 @@ Function .onInit
       StrCpy $LocalAppDataDir "$PROFILE\AppData\Local"
     ${EndIf}
   ${EndIf}
-  !insertmacro LogVar "LocalAppDataDir" $LocalAppDataDir
 
   ReadRegStr $AppDataDir HKCU "Volatile Environment" "APPDATA"
   ${If} $AppDataDir == ""
     StrCpy $AppDataDir "$LocalAppDataDir"
   ${EndIf}
-  !insertmacro LogVar "AppDataDir" $AppDataDir
 
+  ; Create directories for logging
   CreateDirectory "$LocalAppDataDir"
   CreateDirectory "$LocalAppDataDir\FChassis"
   CreateDirectory "$LocalAppDataDir\FChassis\Sample"
   CreateDirectory "$LocalAppDataDir\FChassis\Data"
 
+  ; SECOND: Open log file
   FileOpen $LogFileHandle "$LocalAppDataDir\FChassis_Install.log" w
   ${If} $LogFileHandle == ""
     StrCpy $LocalAppDataDir "$TEMP"
@@ -555,7 +556,51 @@ Function .onInit
     DetailPrint "Log file opened: $LocalAppDataDir\FChassis_Install.log"
   ${EndIf}
 
+  ; THIRD: Now we can use logging macros
   !insertmacro LogMessage "=== Starting .onInit function ==="
+  
+  ; -----------------------------------------------------------------------------
+; Check if W: drive is available (correct WinAPI usage)
+; -----------------------------------------------------------------------------
+!insertmacro LogMessage "Checking if W: drive is available..."
+
+; Proper Unicode call with 64-bit output buffers
+System::Call 'kernel32::GetDiskFreeSpaceExW(w "W:\", *l64, *l64, *l64) i .r0'
+
+; Pop returned 64-bit values from stack (optional but clean)
+Pop $3   ; total size
+Pop $2   ; total free space
+Pop $1   ; free space for user
+
+${If} $0 == 0
+    !insertmacro LogError "W: drive is not available or not accessible!"
+
+    MessageBox MB_OK|MB_ICONSTOP \
+        "W: drive is not available or not accessible.$\n$\n\
+Please run one of the following scripts to map the W: drive:$\n\
+- MapW_UI.bat (for interactive mapping)$\n\
+- MapW_BATCH.bat (for automated mapping)$\n$\n\
+After mapping the W: drive, please run this installer again."
+
+    ${If} $LogFileHandle != 0
+        FileClose $LogFileHandle
+        StrCpy $LogFileHandle 0
+    ${EndIf}
+
+    SetErrorLevel 1
+    Abort
+${Else}
+    !insertmacro LogMessage "W: drive is available and accessible"
+
+    !insertmacro LogVar "Free space available to user" $1
+    !insertmacro LogVar "Total free space on drive" $2
+    !insertmacro LogVar "Total size of drive" $3
+${EndIf}
+
+
+  !insertmacro LogVar "LocalAppDataDir" $LocalAppDataDir
+  !insertmacro LogVar "AppDataDir" $AppDataDir
+
   !insertmacro LogMessage "Checking registry for existing installation..."
 
   ReadRegStr $0 HKLM "${UNINSTALL_KEY}" "UninstallString"
@@ -670,8 +715,8 @@ Function OnInstFilesAbort
   DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "${APPNAME}"
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${APPNAME}"
 
-  Delete "$LOCALAPPDATA\FChassis\FChassis.User.RecentFiles.JSON"
-  Delete "$LOCALAPPDATA\FChassis\FChassis.User.Settings.JSON"
+  ; Delete "$LOCALAPPDATA\FChassis\FChassis.User.RecentFiles.JSON"
+  ; Delete "$LOCALAPPDATA\FChassis\FChassis.User.Settings.JSON"
   RMDir "$LOCALAPPDATA\FChassis"
 
   !insertmacro BroadcastEnvChange
@@ -749,35 +794,35 @@ license_file_done:
     !insertmacro LogMessage "OCCT is already installed, skipping installation"
   ${EndIf}
  
-  !insertmacro LogMessage "Copying user settings files to $LOCALAPPDATA\FChassis..."
-  CreateDirectory "$LOCALAPPDATA\FChassis"
-  IfErrors 0 +2
-    !insertmacro LogError "Failed to create directory: $LOCALAPPDATA\FChassis"
+  ; !insertmacro LogMessage "Copying user settings files to $LOCALAPPDATA\FChassis..."
+  ; CreateDirectory "$LOCALAPPDATA\FChassis"
+  ; IfErrors 0 +2
+    ; !insertmacro LogError "Failed to create directory: $LOCALAPPDATA\FChassis"
 
-  IfFileExists "${FluxSDKBin}\FChassis.User.RecentFiles.JSON" recent_file_exists recent_file_missing
+  ; IfFileExists "${FluxSDKBin}\FChassis.User.RecentFiles.JSON" recent_file_exists recent_file_missing
 
-recent_file_exists:
-  CopyFiles /SILENT "${FluxSDKBin}\FChassis.User.RecentFiles.JSON" "$LOCALAPPDATA\FChassis"
-  IfErrors 0 +2
-    !insertmacro LogError "Failed to copy FChassis.User.RecentFiles.JSON to $LOCALAPPDATA\FChassis"
-  Goto recent_file_done
+; recent_file_exists:
+  ; CopyFiles /SILENT "${FluxSDKBin}\FChassis.User.RecentFiles.JSON" "$LOCALAPPDATA\FChassis"
+  ; IfErrors 0 +2
+    ; !insertmacro LogError "Failed to copy FChassis.User.RecentFiles.JSON to $LOCALAPPDATA\FChassis"
+  ; Goto recent_file_done
 
-recent_file_missing:
-  !insertmacro LogError "FChassis.User.RecentFiles.JSON not found at ${FluxSDKBin}"
+; recent_file_missing:
+  ; !insertmacro LogError "FChassis.User.RecentFiles.JSON not found at ${FluxSDKBin}"
 
-recent_file_done:
-  IfFileExists "${FluxSDKBin}\FChassis.User.Settings.JSON" settings_file_exists settings_file_missing
+; recent_file_done:
+  ; IfFileExists "${FluxSDKBin}\FChassis.User.Settings.JSON" settings_file_exists settings_file_missing
 
-settings_file_exists:
-  CopyFiles /SILENT "${FluxSDKBin}\FChassis.User.Settings.JSON" "$LOCALAPPDATA\FChassis"
-  IfErrors 0 +2
-    !insertmacro LogError "Failed to copy FChassis.User.Settings.JSON to $LOCALAPPDATA\FChassis"
-  Goto settings_file_done
+; settings_file_exists:
+  ; CopyFiles /SILENT "${FluxSDKBin}\FChassis.User.Settings.JSON" "$LOCALAPPDATA\FChassis"
+  ; IfErrors 0 +2
+    ; !insertmacro LogError "Failed to copy FChassis.User.Settings.JSON to $LOCALAPPDATA\FChassis"
+  ; Goto settings_file_done
 
-settings_file_missing:
-  !insertmacro LogError "FChassis.User.Settings.JSON not found at ${FluxSDKBin}"
+; settings_file_missing:
+  ; !insertmacro LogError "FChassis.User.Settings.JSON not found at ${FluxSDKBin}"
 
-settings_file_done:
+; settings_file_done:
   !insertmacro LogMessage "Checking VC++ redistributable installation..."
   nsExec::ExecToStack '"$INSTDIR\VC_redist.x64.exe" /install /quiet /norestart'
   Pop $0
@@ -1065,25 +1110,25 @@ Section "Uninstall"
   ; ===========================================================================
   !insertmacro LogMessage "5. Preserving user data files..."
   
-  ; Check if user data files exist
-  ${If} ${FileExists} "$LOCALAPPDATA\FChassis\FChassis.User.RecentFiles.JSON"
-    !insertmacro LogMessage "   User data file preserved: FChassis.User.RecentFiles.JSON"
-    !insertmacro LogMessage "   Location: $LOCALAPPDATA\FChassis\FChassis.User.RecentFiles.JSON"
-  ${Else}
-    !insertmacro LogMessage "   User data file not found: FChassis.User.RecentFiles.JSON"
-  ${EndIf}
+  ; ; Check if user data files exist
+  ; ${If} ${FileExists} "$LOCALAPPDATA\FChassis\FChassis.User.RecentFiles.JSON"
+    ; !insertmacro LogMessage "   User data file preserved: FChassis.User.RecentFiles.JSON"
+    ; !insertmacro LogMessage "   Location: $LOCALAPPDATA\FChassis\FChassis.User.RecentFiles.JSON"
+  ; ${Else}
+    ; !insertmacro LogMessage "   User data file not found: FChassis.User.RecentFiles.JSON"
+  ; ${EndIf}
   
-  ${If} ${FileExists} "$LOCALAPPDATA\FChassis\FChassis.User.Settings.JSON"
-    !insertmacro LogMessage "   User data file preserved: FChassis.User.Settings.JSON"
-    !insertmacro LogMessage "   Location: $LOCALAPPDATA\FChassis\FChassis.User.Settings.JSON"
-  ${Else}
-    !insertmacro LogMessage "   User data file not found: FChassis.User.Settings.JSON"
-  ${EndIf}
+  ; ${If} ${FileExists} "$LOCALAPPDATA\FChassis\FChassis.User.Settings.JSON"
+    ; !insertmacro LogMessage "   User data file preserved: FChassis.User.Settings.JSON"
+    ; !insertmacro LogMessage "   Location: $LOCALAPPDATA\FChassis\FChassis.User.Settings.JSON"
+  ; ${Else}
+    ; !insertmacro LogMessage "   User data file not found: FChassis.User.Settings.JSON"
+  ; ${EndIf}
   
-  ${If} ${FileExists} "$LOCALAPPDATA\FChassis"
-    !insertmacro LogMessage "   User data directory preserved: $LOCALAPPDATA\FChassis"
+  ${If} ${FileExists} "W:\FChassis" 
+    !insertmacro LogMessage "   User data directory preserved: W:\FChassis"
   ${Else}
-    !insertmacro LogMessage "   User data directory not found: $LOCALAPPDATA\FChassis"
+    !insertmacro LogMessage "   User data directory not found: W:\FChassis"
   ${EndIf}
   
   !insertmacro LogMessage "   User data preservation completed"
@@ -1174,7 +1219,7 @@ Section "Uninstall"
   MessageBox MB_OK|MB_ICONINFORMATION \
     "${APPNAME} has been successfully uninstalled.$\n$\n\
     Note: Your user settings and recent files have been preserved at:$\n\
-    $LOCALAPPDATA\FChassis$\n$\n\
+    W:\FChassis$\n$\n\
     You can delete this folder manually if you don't want to keep these files."
   
 SectionEnd
