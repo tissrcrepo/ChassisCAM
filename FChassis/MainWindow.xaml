@@ -53,6 +53,18 @@
                             <!-- Optional: make items non-clickable (display-only) -->
                             <!-- <Setter Property="IsHitTestVisible" Value="False" /> -->
                             <EventSetter Event="Click" Handler="OnRecentFileItemClick"/>
+
+                            <!-- RIGHT CLICK CONTEXT MENU -->
+                            <Setter Property="ContextMenu">
+                                <Setter.Value>
+                                    <ContextMenu>
+
+                                        <MenuItem Header="Open DINs"
+                                  Click="OnRecentFileItemRMBClick"/>
+
+                                    </ContextMenu>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
                     </MenuItem.ItemContainerStyle>
                 </MenuItem>

@@ -401,7 +401,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged {
              DateTimeOffset.TryParse (ts, out var dto) ? dto : DateTimeOffset.MinValue;
 
          foreach (var kv in mRecentFilesMap.OrderByDescending (kv => ParseTs (kv.Value))) {
-            RecentFiles.Add ($"{kv.Key}\t{kv.Value}");
+            RecentFiles.Add ($"{kv.Key}\t\t{kv.Value}");
          }
       }
    }
@@ -429,6 +429,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged {
 
       LoadPart (path);
    }
+
    void OnMenuDirOpen (object sender, RoutedEventArgs e) {
       var dlg = new FolderPicker {
          InputPath = PathUtils.ConvertToWindowsPath (mSrcDir),
@@ -625,7 +626,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged {
    #endregion
 
    #region Properties
-   private string _currentFile = "";
+   string _currentFile = "";
    public string CurrentFile {
       get => _currentFile;
       set {
@@ -964,36 +965,39 @@ public partial class MainWindow : Window, INotifyPropertyChanged {
    }
 
    void OpenDINsClick (object sender, RoutedEventArgs e) {
-      if (Files.SelectedItem is string selectedFile) {
-         string dinFileNameH1 = "", dinFileNameH2 = "";
-         try {
-            string[] paths = Environment.GetEnvironmentVariable ("PATH")?.Split (';');
-            string notepadPlusPlus = paths?.Select (p => System.IO.Path.Combine (p, "notepad++.exe")).FirstOrDefault (File.Exists);
-            string notepad = paths?.Select (p => System.IO.Path.Combine (p, "notepad.exe")).FirstOrDefault (File.Exists);
-            string editor = notepadPlusPlus ?? notepad; // Prioritize Notepad++, fallback to Notepad
+      if (Files.SelectedItem is string selectedFile)
+         OpenDinsForFile (selectedFile);
+   }
 
-            if (editor == null) {
-               MessageBox.Show ("Neither Notepad++ nor Notepad was found in the system PATH.", "Error",
-                  MessageBoxButton.OK, MessageBoxImage.Error);
-               return;
-            }
+   void OpenDinsForFile (string selectedFile) {
+      string dinFileNameH1 = "", dinFileNameH2 = "";
+      try {
+         string[] paths = Environment.GetEnvironmentVariable ("PATH")?.Split (';');
+         string notepadPlusPlus = paths?.Select (p => System.IO.Path.Combine (p, "notepad++.exe")).FirstOrDefault (File.Exists);
+         string notepad = paths?.Select (p => System.IO.Path.Combine (p, "notepad.exe")).FirstOrDefault (File.Exists);
+         string editor = notepadPlusPlus ?? notepad; // Prioritize Notepad++, fallback to Notepad
 
-            // Construct the DIN file paths using the selected file name
-            string dinFileSuffix = string.IsNullOrEmpty (MCSettings.It.DINFilenameSuffix) ? "" : $"-{MCSettings.It.DINFilenameSuffix}-";
-            dinFileNameH1 = $@"{Utils.RemoveLastExtension (selectedFile)}-{1}{dinFileSuffix}({(MCSettings.It.PartConfig == MCSettings.PartConfigType.LHComponent ? "LH" : "RH")}).din";
-            dinFileNameH1 = System.IO.Path.Combine (MCSettings.It.NCFilePath, "Head1", dinFileNameH1);
-            dinFileNameH2 = $@"{Utils.RemoveLastExtension (selectedFile)}-{2}{dinFileSuffix}({(MCSettings.It.PartConfig == MCSettings.PartConfigType.LHComponent ? "LH" : "RH")}).din";
-            dinFileNameH2 = System.IO.Path.Combine (MCSettings.It.NCFilePath, "Head2", dinFileNameH2);
-
-            if (!File.Exists (dinFileNameH1)) throw new Exception ($"\nFile: {dinFileNameH1} does not exist.\nGenerate G Code first");
-            if (!File.Exists (dinFileNameH2)) throw new Exception ($"\nFile: {dinFileNameH2} does not exist.\nGenerate G Code first");
-
-            // Open the files
-            Process.Start (new ProcessStartInfo (editor, $"\"{dinFileNameH1}\"") { UseShellExecute = true });
-            Process.Start (new ProcessStartInfo (editor, $"\"{dinFileNameH2}\"") { UseShellExecute = true });
-         } catch (Exception ex) {
-            MessageBox.Show ($"Error opening DIN files: {ex.Message}.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+         if (editor == null) {
+            MessageBox.Show ("Neither Notepad++ nor Notepad was found in the system PATH.", "Error",
+               MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
          }
+
+         // Construct the DIN file paths using the selected file name
+         string dinFileSuffix = string.IsNullOrEmpty (MCSettings.It.DINFilenameSuffix) ? "" : $"-{MCSettings.It.DINFilenameSuffix}-";
+         dinFileNameH1 = $@"{Utils.RemoveLastExtension (selectedFile)}-{1}{dinFileSuffix}({(MCSettings.It.PartConfig == MCSettings.PartConfigType.LHComponent ? "LH" : "RH")}).din";
+         dinFileNameH1 = System.IO.Path.Combine (MCSettings.It.NCFilePath, "Head1", dinFileNameH1);
+         dinFileNameH2 = $@"{Utils.RemoveLastExtension (selectedFile)}-{2}{dinFileSuffix}({(MCSettings.It.PartConfig == MCSettings.PartConfigType.LHComponent ? "LH" : "RH")}).din";
+         dinFileNameH2 = System.IO.Path.Combine (MCSettings.It.NCFilePath, "Head2", dinFileNameH2);
+
+         if (!File.Exists (dinFileNameH1)) throw new Exception ($"\nFile: {dinFileNameH1} does not exist.\nGenerate G Code first");
+         if (!File.Exists (dinFileNameH2)) throw new Exception ($"\nFile: {dinFileNameH2} does not exist.\nGenerate G Code first");
+
+         // Open the files
+         Process.Start (new ProcessStartInfo (editor, $"\"{dinFileNameH1}\"") { UseShellExecute = true });
+         Process.Start (new ProcessStartInfo (editor, $"\"{dinFileNameH2}\"") { UseShellExecute = true });
+      } catch (Exception ex) {
+         MessageBox.Show ($"Error opening DIN files: {ex.Message}.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
       }
    }
    #endregion
@@ -1095,7 +1099,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged {
 
    #endregion
 
-   private void VerifyFluxAssemblies () {
+   void VerifyFluxAssemblies () {
       try {
          Console.WriteLine ("=== Flux Assembly Dependency Analysis ===");
          Console.WriteLine ($"Current Domain: {AppDomain.CurrentDomain.FriendlyName}");
@@ -1242,7 +1246,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged {
       }
    }
 
-   private void InitializeDriveMapping () {
+   void InitializeDriveMapping () {
       try {
          // 1. Check if W: is already mapped with required structure
          if (DriveMapper.IsDriveMapped ("W:")) {
@@ -1358,7 +1362,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged {
       }
    }
 
-   private bool LoadFluxBaseAssembly () {
+   bool LoadFluxBaseAssembly () {
       try {
          // Option 1: Use AssemblyLoader if it supports loading
          // Replace "Flux.Base" with the correct assembly name if different
@@ -1397,7 +1401,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged {
       OpenWebsite ("https://www.teckinsoft.in");
    }
 
-   private void OpenWebsite (string url) {
+   void OpenWebsite (string url) {
       try {
          // Use ProcessStartInfo to open Microsoft Edge with the specified URL
          ProcessStartInfo psi = new () {
@@ -1419,6 +1423,25 @@ public partial class MainWindow : Window, INotifyPropertyChanged {
                            "Error", MessageBoxButton.OK, MessageBoxImage.Error);
          }
       }
+   }
+
+   void OnRecentFileItemRMBClick (object sender, RoutedEventArgs e) {
+      if (sender is MenuItem menuItem &&
+          menuItem.DataContext is string recentFile) {
+         string filePath = ExtractPathFromRecentFilesMenuItemEntry (recentFile);
+         // recentFile is the clicked RecentFiles entry
+         // Example: open DINs related to that file
+         filePath = Path.GetFileName (filePath);
+         OpenDinsForFile (filePath);
+      }
+   }
+
+   // Method to extract Windows absolute path from a string 
+   // that contains Path + \t\t + time stamp
+   static string ExtractPathFromRecentFilesMenuItemEntry (string recentEntry) {
+      return recentEntry.Split (
+          ["\t\t"],
+          StringSplitOptions.None)[0];
    }
 }
 
